@@ -1,20 +1,101 @@
 # Reproducible Research: Peer Assessment 1
 
-
 ## Loading and preprocessing the data
 
+Calling `Sys.setlocale()` for international portability
 
+```{r}
+Sys.setlocale("LC_TIME", "English")
+```
+
+Calling read.csv() using default values, keeping only complete cases for now. Reading dates as such with `as.Date()`
+
+
+```{r}
+data <- read.csv("activity.csv")
+data[,2] <- as.Date(data[,2], format="%Y-%m-%d")
+comp <- complete.cases(data)
+comp <- data[comp,]
+```
 
 ## What is mean total number of steps taken per day?
 
+Total number of steps correspond to the 1st column:
 
+```{r}
+names(comp)
+names(comp[1])
+
+```
+
+Which allows us to calculate the meanS and medians of the total number of steps taken (omitting the NAs) per day. We can also plot a histogram of the number of steps taken per day :
+
+```{r}
+library(lattice)
+histogram(~steps|date, data=comp)
+means <- tapply(comp$steps,comp$date,mean)
+medians <- tapply(comp$steps,comp$date,median)
+means
+medians
+```
 
 ## What is the average daily activity pattern?
 
 
+```{r}
+mean_stp_intrvl <- tapply(comp$steps,comp$interval,mean)
+xyplot(mean_stp_intrvl~interval,data=comp,type="l",ylab="Average number of steps")
+max_interval <- names(mean_stp_intrvl[mean_stp_intrvl==max(mean_stp_intrvl)])
+max_interval
+```
+
+The 5 minutes-interval with the maximum number of steps corresponds to interval #`r max_interval`
+ on average across all days.
 
 ## Imputing missing values
 
+By summing the results of the function is.na over the all dataset we can calculate the number of missing values. All of them come from the first column of this dataset (number of steps).
+```{r}
+sum(is.na(data))
+sum(is.na(data$steps))
+```
 
+I then decided to substitute the NAs with the mean value for the corresponding interval
+
+```{r}
+data$steps[is.na(data$steps)] <- mean_stp_intrvl[as.character(data$interval[is.na(data$steps)])]
+head(data$steps)
+head(mean_stp_intrvl)
+```
+I now got my dataset `data` free of NA values
+
+```{r}
+sum(is.na(data))
+```
+
+```{r}
+histogram(~steps|date, data=data)
+means <- tapply(data$steps,data$date,mean)
+medians <- tapply(data$steps,data$date,median)
+means
+medians
+```
+
+The impact of the missing data on the means and the medians for each day is relatively low as the number of missing values was. 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Creating a vector `days` and assigning weekend days to `TRUE` and week days to `FALSE`. I then had to replace this logical vector with corresponding character (there definitely exists a more elegant solution I believe).
+
+By calling the function `with` I get the average number of steps per interval and per week day type (weekend/weekday). I finally plot the results using the base plotting system.
+
+```{r}
+days <- weekdays(data[,2])=="Saturday" | weekdays(data[,2])=="Sunday"
+days[days==TRUE] <- "weekend"
+days[days=="FALSE"] <- "weekday"
+data <- transform(data,days=days)
+df <- data.frame(with(data, tapply(steps, list(interval, days), mean)))
+par(mfcol=c(2,1),mar=c(4,4,4,2))
+plot(unique(data$interval),df[,2],type="l",main="weekend",xlab="Interval",ylab="Average number of steps",col=2)
+plot(unique(data$interval),df[,1],type="l",main="weekday",xlab="Interval",ylab="Average number of steps",col=4)
+```
